@@ -5,12 +5,13 @@ import styled from 'styled-components/native';
 
 // Import các "bộ não" và dịch vụ chúng ta đã làm ở bước trước
 import { useCategory } from '../contexts/CategoryContext';
-import { setNotes } from '../redux/actions';
+import { setNotes, deleteNote } from '../redux/actions';
 import { storageService } from '../services/storageService';
 
 // Import các components
 import SearchBar from '../components/SearchBar';
 import CategoryFilter from '../components/CategoryFilter';
+import NoteItem from '../components/NoteItem';
 
 // --- BẮT ĐẦU DỰNG GIAO DIỆN BẰNG STYLED-COMPONENTS ---
 const Container = styled.View`
@@ -34,16 +35,6 @@ const EmptyText = styled.Text`
   font-size: 16px;
 `;
 
-// Khung tạm thời cho từng Note Item trước khi chúng ta tách thành file riêng
-const TempNoteCard = styled.View`
-  background-color: ${props => props.theme.colors.surface};
-  padding: ${props => props.theme.spacing.medium}px;
-  border-radius: 8px;
-  margin-bottom: ${props => props.theme.spacing.small}px;
-  border-left-width: 5px;
-  border-left-color: ${props => props.theme.colors.primary};
-`;
-
 const NoteTitle = styled.Text`
   font-size: 18px;
   font-weight: bold;
@@ -55,9 +46,37 @@ const NoteContent = styled.Text`
   font-size: 14px;
   color: ${props => props.theme.colors.textSecondary};
 `;
+
+// Nút bấm hình tròn lơ lửng góc phải màn hình để thêm ghi chú nhanh
+const FloatingActionButton = styled.TouchableOpacity`
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  background-color: ${props => props.theme.colors.primary};
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  justify-content: center;
+  align-items: center;
+  shadow-color: #000;
+  shadow-offset: 0px 4px;
+  shadow-opacity: 0.3;
+  shadow-radius: 5px;
+  elevation: 5;
+`;
+
+const FabText = styled.Text`
+  color: #FFFFFF;
+  font-size: 32px;
+  line-height: 35px;
+  font-weight: bold;
+`;
 // --- KẾT THÚC DỰNG GIAO DIỆN ---
 
-const HomeScreen = () => {
+const HomeScreen = ({
+    onNavigateToEdit,
+    onNavigateToAdd,
+}) => {
   const dispatch = useDispatch();
   
   // Lấy danh sách ghi chú từ kho chứa Redux toàn cục [cite: 11]
@@ -71,7 +90,7 @@ const HomeScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // LỘC 1: Tự động chạy khi mở app - Đọc ghi chú từ AsyncStorage đổ vào Redux [cite: 42-43]
+  // Đọc dữ liệu bền vững từ AsyncStorage khi vừa mở ứng dụng lên
   useEffect(() => {
     const loadNotesFromStorage = async () => {
       const savedNotes = await storageService.getNotes();
@@ -80,7 +99,7 @@ const HomeScreen = () => {
     loadNotesFromStorage();
   }, []);
 
-  // LỘC 2: Xử lý Kéo xuống để làm mới (Pull-to-refresh) [cite: 3, 9]
+  // Kéo xuống để đồng bộ/làm mới lại dữ liệu (Pull-to-refresh)
   const handleRefresh = async () => {
     setIsRefreshing(true);
     const savedNotes = await storageService.getNotes();
@@ -88,9 +107,22 @@ const HomeScreen = () => {
     setIsRefreshing(false);
   };
 
-  // LỘC 3: Xử lý Tải thêm dữ liệu khi cuộn xuống đáy (Infinite Scroll) [cite: 3, 9]
+  // Hàm xử lý Xóa ghi chú (Được kích hoạt từ tấm card NoteItem truyền lên)
+  const handleDeleteNote = async (id) => {
+    // 1. Ra lệnh cho bộ não Redux xóa bỏ ghi chú này khỏi UI ngay lập tức
+    dispatch(deleteNote(id));
+    
+    // 2. Lọc mảng cục bộ loại bỏ ghi chú vừa xóa để lưu đè lại vào AsyncStorage bền vững
+    const remainingNotes = notes.filter(note => note.id !== id);
+    await storageService.saveNotes(remainingNotes);
+  };
+
+  // Giả lập cuộn vô hạn (Infinite Scroll) tăng trải nghiệm tải mượt
   const handleLoadMore = () => {
     if (isLoadingMore) return;
+
+    if (filteredNotes.length === 0) return;
+
     setIsLoadingMore(true);
     
     // Giả lập delay 1 giây để tạo cảm giác tải mượt mà, sau này có thể phân trang dữ liệu ở đây
@@ -99,7 +131,7 @@ const HomeScreen = () => {
     }, 1000);
   };
 
-  // LỘC 4: Logic bộ lọc Ghi chú (Kết hợp cả tìm kiếm chữ và danh mục) [cite: 3, 6-7]
+  // Bộ lọc kép: Kết hợp quét từ khóa chữ (Tiêu đề/Nội dung) VÀ Lọc theo tab danh mục
   const filteredNotes = notes.filter(note => {
     const matchesCategory = currentCategory === 'All' || note.category === currentCategory;
     const matchesSearch = note.title.toLowerCase().includes(searchKeyword.toLowerCase()) || 
@@ -117,13 +149,14 @@ const HomeScreen = () => {
       {/* Danh sách hiển thị ghi chú bằng FlatList cực mượt */}
       <FlatList
         data={filteredNotes}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           // Tạm thời hiển thị card đơn giản, lát nữa sẽ thay bằng component NoteItem xịn sò [cite: 18]
-          <TempNoteCard>
-            <NoteTitle>{item.title}</NoteTitle>
-            <NoteContent numberOfLines={2}>{item.content}</NoteContent>
-          </TempNoteCard>
+          <NoteItem 
+            note={item} 
+            onEdit={() => onNavigateToEdit(item)} // Bấm vào thân card để mở màn hình chỉnh sửa
+            onDelete={handleDeleteNote}          // Bấm nút xóa để kích hoạt xử lý xóa
+          />
         )}
         // Hiển thị chữ này nếu danh sách rỗng
         ListEmptyComponent={<EmptyText>Chưa có ghi chú nào. Hãy tạo mới ngay!</EmptyText>}
@@ -138,6 +171,11 @@ const HomeScreen = () => {
         onEndReachedThreshold={0.1} // Cách đáy 10% là tự động kích hoạt tải thêm
         ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color="#007AFF" /> : null}
       />
+
+      {/* Nút bấm lơ lửng (+) giúp người dùng mở giao diện tạo ghi chú */}
+      <FloatingActionButton onPress={onNavigateToAdd}>
+        <FabText>+</FabText>
+      </FloatingActionButton>
     </Container>
   );
 };
