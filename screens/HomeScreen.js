@@ -8,6 +8,10 @@ import { useCategory } from '../contexts/CategoryContext';
 import { setNotes } from '../redux/actions';
 import { storageService } from '../services/storageService';
 
+// Import các components
+import SearchBar from '../components/SearchBar';
+import CategoryFilter from '../components/CategoryFilter';
+
 // --- BẮT ĐẦU DỰNG GIAO DIỆN BẰNG STYLED-COMPONENTS ---
 const Container = styled.View`
   flex: 1;
@@ -107,9 +111,8 @@ const HomeScreen = () => {
     <Container>
       <HeaderText>Ghi chú của tôi</HeaderText>
 
-      {/* 🛠 NƠI ĐẶT THANH TÌM KIẾM & BỘ LỌC DANH MỤC TRONG BƯỚC TIẾP THEO */}
-      {/* <SearchBar keyword={searchKeyword} onChange={setSearchKeyword} /> */}
-      {/* <CategoryFilter /> */}
+     <SearchBar keyword={searchKeyword} onChange={setSearchKeyword} />
+     <CategoryFilter />
 
       {/* Danh sách hiển thị ghi chú bằng FlatList cực mượt */}
       <FlatList
