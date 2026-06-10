@@ -13,10 +13,35 @@ import { CategoryProvider } from './contexts/CategoryContext';
 import { ThemeProvider } from 'styled-components/native';
 import { theme } from './styles/theme';
 
-// 4. Import màn hình chính (Để tạm thời hiển thị lên màn hình)
+// 4. Import màn hình chính và màn hình chỉnh sửa ghi chú
 import HomeScreen from './screens/HomeScreen';
+import EditNoteScreen from './screens/EditNoteScreen';
 
 export default function App() {
+
+  // Quản lý xem đang hiển thị màn hình nào ('HOME' hoặc 'EDIT')
+  const [currentScreen, setCurrentScreen] = useState('HOME');
+  // Quản lý dữ liệu ghi chú đang muốn sửa (nếu bấm Thêm mới thì cái này bằng null)
+  const [noteToEdit, setNoteToEdit] = useState(null);
+
+  // Hàm chuyển sang màn hình Thêm mới
+  const handleGoToAdd = () => {
+    setNoteToEdit(null);
+    setCurrentScreen('EDIT');
+  };
+
+  // Hàm chuyển sang màn hình Sửa
+  const handleGoToEdit = (note) => {
+    setNoteToEdit(note);
+    setCurrentScreen('EDIT');
+  };
+
+  // Hàm quay về màn hình chính
+  const handleGoBack = () => {
+    setCurrentScreen('HOME');
+    setNoteToEdit(null);
+  };
+
   return (
     // Bọc Redux đầu tiên để quản lý toàn bộ dữ liệu ghi chú
     <ReduxProvider store={store}>
@@ -28,9 +53,12 @@ export default function App() {
           {/* SafeAreaView giúp giao diện không bị đè lên tai thỏ/thanh trạng thái của điện thoại */}
           <SafeAreaView style={styles.container}>
             <StatusBar style="auto" />
-            
-            {/* Hiển thị màn hình HomeScreen lên trước */}
-            <HomeScreen />
+           
+           {currentScreen === 'HOME' ? (
+              <HomeScreen onNavigateToEdit={handleGoToEdit} onNavigateToAdd={handleGoToAdd} />
+            ) : (
+              <EditNoteScreen noteToEdit={noteToEdit} onBack={handleGoBack} />
+            )}
             
           </SafeAreaView>
 
